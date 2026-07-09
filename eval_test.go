@@ -39,11 +39,7 @@ func testGlobalModeEvaluation(t *testing.T) {
 		runEvalTests(t, tests, "")
 	})
 
-	t.Run("From_Test_Files", func(t *testing.T) {
-		globalTests := genModeGlobalTests(t)
-		runModeGlobalTests(t, globalTests, false) // File mode
-		runModeGlobalTests(t, globalTests, true)  // Script mode
-	})
+
 }
 
 func testModuleModeEvaluation(t *testing.T) {
@@ -63,11 +59,7 @@ func testModuleModeEvaluation(t *testing.T) {
 		runEvalTests(t, tests, "")
 	})
 
-	t.Run("From_Test_Files", func(t *testing.T) {
-		moduleTests := genModeModuleTests(t)
-		runModeModuleTests(t, moduleTests, false) // File mode
-		runModeModuleTests(t, moduleTests, true)  // Script mode
-	})
+
 }
 
 func testLoadOperations(t *testing.T) {
@@ -89,13 +81,6 @@ func testLoadOperations(t *testing.T) {
 			},
 		},
 		{
-			name: "load_module_file",
-			file: "02_load_module_file.js",
-			expectValue: func(t *testing.T, val *qjs.Value, err error) {
-				assert.Equal(t, "exported from module file", val.String())
-			},
-		},
-		{
 			name:        "load_module_bytecode",
 			file:        "03_load_module_bytecode.js",
 			code:        "export const moduleExported = 55555",
@@ -109,14 +94,14 @@ func testLoadOperations(t *testing.T) {
 			file: "03_mixed_load.js",
 			prepare: func(rt *qjs.Runtime) {
 				_ = must(rt.Load("mod_a.js", qjs.Code("export const getA = () => 'A';")))
-				_ = must(rt.Load("./testdata/04_load/03_mixed/mod_b"))
-				_ = must(rt.Load("./testdata/04_load/03_mixed/mod_c"))
+				_ = must(rt.Load("mod_b.js", qjs.Code("export const getB = () => 'B';")))
+				_ = must(rt.Load("mod_c.js", qjs.Code("export const getC = () => 'C';")))
 				bytesD := must(rt.Compile("mod_d.js", qjs.Code("export const getD = () => 'D';"), qjs.TypeModule()))
 				_ = must(rt.Load("mod_d.js", qjs.Bytecode(bytesD)))
-				bytesE := must(rt.Compile("./testdata/04_load/03_mixed/mod_e", qjs.TypeModule()))
-				_ = must(rt.Load("./testdata/04_load/03_mixed/mod_e", qjs.Bytecode(bytesE)))
+				bytesE := must(rt.Compile("mod_e.js", qjs.Code("export const getE = () => 'E';"), qjs.TypeModule()))
+				_ = must(rt.Load("mod_e.js", qjs.Bytecode(bytesE)))
 			},
-			code: `import { getA } from 'mod_a.js'; import { getB } from './03_mixed/mod_b'; import { getC } from './03_mixed/mod_c'; import { getD } from 'mod_d.js'; import { getE } from './03_mixed/mod_e'; export const moduleExported = getA() + getB() + getC() + getD() + getE();`,
+			code: `import { getA } from 'mod_a.js'; import { getB } from 'mod_b.js'; import { getC } from 'mod_c.js'; import { getD } from 'mod_d.js'; import { getE } from 'mod_e.js'; export const moduleExported = getA() + getB() + getC() + getD() + getE();`,
 			expectValue: func(t *testing.T, val *qjs.Value, err error) {
 				assert.Equal(t, "ABCDE", val.String())
 			},
@@ -315,78 +300,12 @@ func TestEval(t *testing.T) {
 	})
 }
 
-// Module Loading Tests
-func TestModuleLoading(t *testing.T) {
-	t.Run("File_Resolution", func(t *testing.T) {
-		tests := []evalTest{
-			{
-				name:    "file_not_found",
-				file:    "not_found.js",
-				options: []qjs.EvalOptionFunc{qjs.TypeModule()},
-				expectErr: func(t *testing.T, err error) {
-					assert.Error(t, err)
-					assert.Contains(t, err.Error(), "No such file or directory: testdata/00_loader/not_found.js")
-				},
-			},
-			{
-				name:    "real_filename",
-				file:    "01_realname/file.js",
-				options: []qjs.EvalOptionFunc{qjs.TypeModule()},
-				expectValue: func(t *testing.T, val *qjs.Value, err error) {
-					assert.Equal(t, "Hello, World!", val.String())
-				},
-			},
-		}
-		runEvalTests(t, tests, "./testdata/00_loader")
-	})
-
-	t.Run("Auto_Extensions", func(t *testing.T) {
-		tests := []evalTest{
-			{
-				name:    "auto_index_js",
-				file:    "02_autoindexjs",
-				options: []qjs.EvalOptionFunc{qjs.TypeModule()},
-				expectValue: func(t *testing.T, val *qjs.Value, err error) {
-					assert.Equal(t, "autoindexjs", val.String())
-				},
-			},
-			{
-				name:    "auto_index_mjs",
-				file:    "03_autoindexmjs",
-				options: []qjs.EvalOptionFunc{qjs.TypeModule()},
-				expectValue: func(t *testing.T, val *qjs.Value, err error) {
-					assert.Equal(t, "autoindexmjs", val.String())
-				},
-			},
-			{
-				name:    "auto_ext_js",
-				file:    "04_autoextjs/file",
-				options: []qjs.EvalOptionFunc{qjs.TypeModule()},
-				expectValue: func(t *testing.T, val *qjs.Value, err error) {
-					assert.Equal(t, "file.js", val.String())
-				},
-			},
-			{
-				name:    "auto_ext_mjs",
-				file:    "05_autoextmjs/file",
-				options: []qjs.EvalOptionFunc{qjs.TypeModule()},
-				expectValue: func(t *testing.T, val *qjs.Value, err error) {
-					assert.Equal(t, "file.mjs", val.String())
-				},
-			},
-		}
-		runEvalTests(t, tests, "./testdata/00_loader")
-	})
-}
-
 // Compilation Tests
 func TestCompilation(t *testing.T) {
 	t.Run("Bytecode_Generation", func(t *testing.T) {
 		tests := []evalTest{
 			{name: "compile_global_code", file: "compile_global_code.js", code: "55555", expectValue: func(t *testing.T, val *qjs.Value, err error) { assert.Equal(t, int32(55555), val.Int32()) }},
-			{name: "compile_global_file", file: "01_global/index.js", expectValue: func(t *testing.T, val *qjs.Value, err error) { assert.Equal(t, "Hello, World!", val.String()) }},
 			{name: "compile_module_code", file: "compile_module_code.js", code: "export default 55555", options: []qjs.EvalOptionFunc{qjs.TypeModule()}, expectValue: func(t *testing.T, val *qjs.Value, err error) { assert.Equal(t, int32(55555), val.Int32()) }},
-			{name: "compile_module_file", file: "02_module/index.js", options: []qjs.EvalOptionFunc{qjs.TypeModule()}, expectValue: func(t *testing.T, val *qjs.Value, err error) { assert.Equal(t, "Hello from lib_a", val.String()) }},
 		}
 
 		runCompileTests(t, tests, "./testdata/03_compile")

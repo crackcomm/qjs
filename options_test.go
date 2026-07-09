@@ -1,8 +1,6 @@
 package qjs_test
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/fastschema/qjs"
@@ -23,14 +21,6 @@ func TestEvalOptions(t *testing.T) {
 	})
 
 	t.Run("CWDOption", func(t *testing.T) {
-		// Store original working directory to restore later
-		originalCwd, err := os.Getwd()
-		require.NoError(t, err)
-
-		t.Cleanup(func() {
-			_ = os.Chdir(originalCwd)
-		})
-
 		t.Run("default_cwd_from_os_getwd", func(t *testing.T) {
 			runtime, err := qjs.New()
 			require.NoError(t, err)
@@ -42,27 +32,6 @@ func TestEvalOptions(t *testing.T) {
 			runtime, err := qjs.New(qjs.Option{CWD: tempDir})
 			require.NoError(t, err)
 			runtime.Close()
-		})
-
-		t.Run("deleted_working_directory", func(t *testing.T) {
-			// Create a temporary directory and change to it
-			tempDir := t.TempDir()
-			subDir := filepath.Join(tempDir, "workdir")
-			err := os.Mkdir(subDir, 0755)
-			require.NoError(t, err, "Failed to create subdirectory")
-
-			// Change to the subdirectory
-			err = os.Chdir(subDir)
-			require.NoError(t, err)
-
-			// Remove the current working directory while we're in it
-			err = os.RemoveAll(subDir)
-			require.NoError(t, err)
-
-			_, err = qjs.New()
-			_ = os.Chdir(originalCwd)
-			assert.Error(t, err)
-			assert.Contains(t, err.Error(), "failed to get runtime options")
 		})
 	})
 

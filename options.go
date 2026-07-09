@@ -2,7 +2,6 @@ package qjs
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 )
@@ -219,12 +218,6 @@ func getRuntimeOption(registry *ProxyRegistry, options ...Option) (option Option
 		option = Option{}
 	} else {
 		option = options[0]
-	}
-
-	if option.CWD == "" {
-		if option.CWD, err = os.Getwd(); err != nil {
-			return Option{}, fmt.Errorf("cannot get current working directory: %w", err)
-		}
 	}
 
 	if option.Context == nil {

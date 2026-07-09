@@ -4,9 +4,6 @@ JSContext *New_QJSContext(JSRuntime *rt)
 {
   JSContext *ctx;
   ctx = JS_NewContext(rt);
-  js_init_module_std(ctx, "qjs:std");
-  js_init_module_os(ctx, "qjs:os");
-  js_init_module_bjson(ctx, "qjs:bjson");
   js_set_global_objs(ctx);
 
   return ctx;

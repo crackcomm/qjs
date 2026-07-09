@@ -105,84 +105,9 @@ JSValue QJS_ThrowInternalError(JSContext *ctx, const char *fmt)
 #endif
 #endif
 
-static JSValue js_gc(
-    JSContext *ctx,
-    JSValue this_val,
-    int argc,
-    JSValue *argv)
-{
-    JS_RunGC(JS_GetRuntime(ctx));
-    return JS_UNDEFINED;
-}
-
-static JSValue js_navigator_get_userAgent(JSContext *ctx, JSValue this_val)
-{
-    char version[32];
-    snprintf(version, sizeof(version), "quickjs-ng/%s", JS_GetVersion());
-    return JS_NewString(ctx, version);
-}
-
-static const JSCFunctionListEntry global_obj[] = {
-    JS_CFUNC_DEF("gc", 0, js_gc),
-};
-
-static const JSCFunctionListEntry navigator_proto_funcs[] = {
-    JS_CGETSET_DEF2("userAgent", js_navigator_get_userAgent, NULL, JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE),
-    JS_PROP_STRING_DEF("[Symbol.toStringTag]", "Navigator", JS_PROP_CONFIGURABLE),
-};
-
 void js_set_global_objs(JSContext *ctx)
 {
-    JSValue global = JS_GetGlobalObject(ctx);
-    JS_SetPropertyFunctionList(
-        ctx,
-        global,
-        global_obj,
-        countof(global_obj));
-    JSValue navigator_proto = JS_NewObject(ctx);
-    JS_SetPropertyFunctionList(
-        ctx,
-        navigator_proto,
-        navigator_proto_funcs,
-        countof(navigator_proto_funcs));
-    JSValue navigator = JS_NewObjectProto(ctx, navigator_proto);
-    JS_DefinePropertyValueStr(
-        ctx,
-        global,
-        "navigator",
-        navigator,
-        JS_PROP_CONFIGURABLE | JS_PROP_ENUMERABLE);
-
-    JS_FreeValue(ctx, global);
-    JS_FreeValue(ctx, navigator_proto);
-
     js_std_add_helpers(ctx, 0, 0);
-
-    /* make 'std' and 'os' visible to non module code */
-    const char *str =
-        "import * as bjson from 'qjs:bjson';\n"
-        "import * as std from 'qjs:std';\n"
-        "import * as os from 'qjs:os';\n"
-        "globalThis.bjson = bjson;\n"
-        "globalThis.std = std;\n"
-        "globalThis.os = os;\n"
-        "globalThis.setTimeout = os.setTimeout;\n"
-        "globalThis.setInterval = os.setInterval;\n"
-        "globalThis.clearTimeout = os.clearTimeout;\n"
-        "globalThis.clearInterval = os.clearInterval;\n";
-
-    QJSEvalOptions opts = {
-        .buf = str,
-        .filename = "<init_global>",
-        .eval_flags = JS_EVAL_TYPE_MODULE};
-
-    JSValue val = QJS_Eval(ctx, opts);
-    if (JS_IsException(val))
-    {
-        js_std_dump_error(ctx);
-        exit(1);
-    }
-    JS_FreeValue(ctx, val);
 }
 
 bool file_exists(const char *path)

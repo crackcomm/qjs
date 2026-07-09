@@ -132,9 +132,6 @@ func New(options ...Option) (runtime *Runtime, err error) {
 		return nil, fmt.Errorf("failed to setup host module: %w", err)
 	}
 
-	fsConfig := wazero.
-		NewFSConfig().
-		WithDirMount(runtime.option.CWD, "/")
 	if runtime.module, err = runtime.wrt.InstantiateModule(
 		option.Context,
 		compiledQJSModule,
@@ -143,7 +140,6 @@ func New(options ...Option) (runtime *Runtime, err error) {
 			WithSysWalltime().
 			WithSysNanotime().
 			WithSysNanosleep().
-			WithFSConfig(fsConfig).
 			WithStdout(option.Stdout).
 			WithStderr(option.Stderr),
 	); err != nil {
