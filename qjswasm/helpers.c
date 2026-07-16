@@ -525,10 +525,12 @@ uint64_t *QJS_JSONStringify(JSContext *ctx, JSValue v)
         return NULL; // Allocation failure
     }
 
-    // Store the address of the string in the high 32 bits and the length in the low 32 bits
+    // Store the address of the string in the high 32 bits and the length in the low 32 bits.
+    // NOTE: The C string is intentionally NOT freed here; its address is handed to the
+    // caller which reads it after this call returns. Freeing it now would create a
+    // use-after-free once the memory is reallocated (matches QJS_ToCString behaviour).
     *result = ((uint64_t)(uintptr_t)ptr << 32) | (uint32_t)len;
     JS_FreeValue(ctx, ref);
-    JS_FreeCString(ctx, ptr);
     return result;
 }
 
