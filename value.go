@@ -278,7 +278,7 @@ func (v *Value) GetProperty(name *Value) *Value {
 
 func (v *Value) SetProperty(name, val *Value) {
 	atom := v.Call("JS_ValueToAtom", v.Ctx(), name.Raw())
-	v.Call("JS_SetProperty", v.Ctx(), v.Raw(), atom.Raw(), val.Raw())
+	v.Call("JS_SetProperty", v.Ctx(), v.Raw(), atom.Raw(), val.Clone().Raw())
 }
 
 // GetPropertyStr returns the value of the property with the given name.
@@ -293,7 +293,7 @@ func (v *Value) GetPropertyStr(name string) *Value {
 func (v *Value) SetPropertyStr(name string, val *Value) {
 	if val != nil {
 		nameVal := v.context.NewStringHandle(name)
-		v.Call("JS_SetPropertyStr", v.Ctx(), v.Raw(), nameVal.Raw(), val.Raw())
+		v.Call("JS_SetPropertyStr", v.Ctx(), v.Raw(), nameVal.Raw(), val.Clone().Raw())
 	}
 }
 
@@ -358,7 +358,7 @@ func (v *Value) InvokeJS(fname string, args ...*Value) (*Value, error) {
 
 // SetPropertyIndex sets the value of the property with the given index.
 func (v *Value) SetPropertyIndex(index int64, val *Value) {
-	v.Call("JS_SetPropertyUint32", v.Ctx(), v.Raw(), uint64(index), val.Raw())
+	v.Call("JS_SetPropertyUint32", v.Ctx(), v.Raw(), uint64(index), val.Clone().Raw())
 }
 
 // GetPropertyIndex returns the value of the property with the given index.
