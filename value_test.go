@@ -839,3 +839,35 @@ func TestValuePromiseOperations(t *testing.T) {
 		assert.Error(t, promise.Reject())
 	})
 }
+
+// TestJSONStringifyUseAfterFree is a regression test for a use-after-free in
+// QJS_JSONStringify: the underlying C string was freed before the packed
+// pointer (which references it) was read back on the Go side. The bug only
+// manifests when the freed memory is reallocated between the C-side free and
+// the Go-side read. A failing JSONStringify (circular reference) goes through
+// the exception path, which performs extra allocations that reuse the freed
+// region and corrupt the result of a subsequent JSONStringify.
+func TestJSONStringifyUseAfterFree(t *testing.T) {
+	t.Run("StringifyAfterFailedStringify", func(t *testing.T) {
+		rt, ctx := setupTestContext(t)
+		defer rt.Close()
+
+		circular := must(ctx.Eval("circular.js", qjs.Code(`
+			const obj = {};
+			obj.self = obj;
+			obj
+		`)))
+		defer circular.Free()
+
+		_, err := circular.JSONStringify()
+		require.Error(t, err, "circular reference must fail to stringify")
+
+		value := ctx.NewString("hello")
+		defer value.Free()
+
+		got, err := value.JSONStringify()
+		require.NoError(t, err)
+		assert.Equal(t, `"hello"`, got,
+			"JSONStringify result was corrupted by a use-after-free")
+	})
+}
