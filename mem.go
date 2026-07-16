@@ -260,7 +260,10 @@ func (m *Mem) WriteString(ptr uint32, s string) error {
 func (m *Mem) StringFromPackedPtr(ptr uint64) string {
 	addr, size := m.UnpackPtr(ptr)
 
-	str, err := m.ReadString(addr, size)
+	if size == math.MaxUint32 {
+		panic(ErrIndexOutOfRange)
+	}
+	str, err := m.ReadString(addr, size+1)
 	if err != nil {
 		panic(err)
 	}
@@ -310,9 +313,9 @@ func (m *Mem) calculateSafeReadLength(addr, maxlen uint32) uint32 {
 
 	// Calculate safe read length including null terminator space
 	available := memSize - addr
-	if available <= maxlen {
+	if available < maxlen {
 		return available
 	}
 
-	return maxlen + 1
+	return maxlen
 }

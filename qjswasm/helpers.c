@@ -196,7 +196,7 @@ bool QJS_IsException(JSValue val)
 
 bool QJS_IsError(JSContext *ctx, JSValue val)
 {
-    return JS_IsError(ctx, val);
+    return JS_IsError(val);
 }
 
 bool QJS_IsUninitialized(JSValue val)

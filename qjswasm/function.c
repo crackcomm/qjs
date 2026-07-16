@@ -69,12 +69,15 @@ JSValue QJS_CreateFunctionProxy(JSContext *ctx, uint64_t func_id, uint64_t ctx_i
                     "}";
   }
 
-  JSValue proxy_func = JS_Eval(
+  JSEvalOptions ev = {0};
+  ev.version = JS_EVAL_OPTIONS_VERSION;
+  ev.eval_flags = JS_EVAL_TYPE_GLOBAL;
+  ev.filename = "<proxy_factory>";
+  JSValue proxy_func = JS_Eval2(
       ctx,
       proxy_content,
       strlen(proxy_content),
-      "<proxy_factory>",
-      JS_EVAL_TYPE_GLOBAL);
+      &ev);
   if (JS_IsException(proxy_func))
   {
     JS_FreeValue(ctx, proxy);

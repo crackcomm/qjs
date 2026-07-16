@@ -106,7 +106,11 @@ static JSValue load_buf(JSContext *ctx, QJSEvalOptions opts, int flags, bool eva
 
     else
     {
-        module_val = JS_Eval(ctx, (const char *)buf, buf_len, opts.filename, flags);
+        JSEvalOptions ev = {0};
+        ev.version = JS_EVAL_OPTIONS_VERSION;
+        ev.eval_flags = flags;
+        ev.filename = opts.filename;
+        module_val = JS_Eval2(ctx, (const char *)buf, buf_len, &ev);
         if (JS_IsException(module_val))
         {
             if (is_file)
@@ -176,8 +180,13 @@ static JSModuleDef *js_module_loader_json(JSContext *ctx, const char *module_nam
     snprintf(module_source, source_len, module_source_template, json_string);
 
     /* Compile the module */
-    func_val = JS_Eval(ctx, module_source, strlen(module_source), module_name,
-                       JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY);
+    {
+        JSEvalOptions ev = {0};
+        ev.version = JS_EVAL_OPTIONS_VERSION;
+        ev.eval_flags = JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY;
+        ev.filename = module_name;
+        func_val = JS_Eval2(ctx, module_source, strlen(module_source), &ev);
+    }
 
     /* Cleanup */
     free(module_source);
@@ -202,7 +211,7 @@ static JSModuleDef *js_module_loader_json(JSContext *ctx, const char *module_nam
 }
 
 /* Module loader with support for appending common suffixes and JSON modules */
-JSModuleDef *QJS_ModuleLoader(JSContext *ctx, const char *module_name, void *opaque)
+JSModuleDef *QJS_ModuleLoader(JSContext *ctx, const char *module_name, void *opaque, JSValueConst attributes)
 {
     module_name = detect_entry_point((char *)module_name);
     if (!module_name)
@@ -214,8 +223,28 @@ JSModuleDef *QJS_ModuleLoader(JSContext *ctx, const char *module_name, void *opa
         return js_module_loader_json(ctx, module_name);
     }
 
-    JSModuleDef *mod = js_module_loader(ctx, module_name, opaque);
-    return mod;
+    /* Load and compile the module source as a module definition. */
+    size_t buf_len = 0;
+    uint8_t *buf = js_load_file(ctx, &buf_len, module_name);
+    if (!buf)
+        return NULL;
+
+    JSEvalOptions opts = {0};
+    opts.version = JS_EVAL_OPTIONS_VERSION;
+    opts.eval_flags = JS_EVAL_TYPE_MODULE | JS_EVAL_FLAG_COMPILE_ONLY;
+    opts.filename = module_name;
+    JSValue module_val = JS_Eval2(ctx, (const char *)buf, buf_len, &opts);
+    js_free(ctx, buf);
+    if (JS_IsException(module_val))
+        return NULL;
+
+    if (JS_VALUE_GET_TAG(module_val) != JS_TAG_MODULE)
+    {
+        JS_FreeValue(ctx, module_val);
+        return NULL;
+    }
+
+    return JS_VALUE_GET_PTR(module_val);
 }
 
 /* Loads a module, compiles it (with import.meta support), and resolves it */
