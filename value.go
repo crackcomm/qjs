@@ -1,7 +1,6 @@
 package qjs
 
 import (
-	"errors"
 	"fmt"
 	"math/big"
 	"time"
@@ -390,18 +389,7 @@ func (v *Value) ToByteArray() []byte {
 }
 
 func (v *Value) Exception() error {
-	cause := v.String()
-
-	stack := v.GetPropertyStr("stack")
-	defer stack.Free()
-
-	if stack.IsUndefined() {
-		return errors.New(cause)
-	}
-
-	stackStr := stack.String()
-
-	return errors.New(cause + "\n" + stackStr)
+	return newJSError(v)
 }
 
 func (v *Value) IsNumber() bool {

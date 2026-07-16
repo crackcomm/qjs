@@ -263,3 +263,40 @@ func TestNewInvalidJsInputErr_SuccessfulJSONStringify(t *testing.T) {
 	assert.Contains(t, result.Error(), `"test string"`) // Successful JSONStringify
 	assert.NotContains(t, result.Error(), "JSONStringify failed")
 }
+
+func TestParseStack(t *testing.T) {
+	t.Run("leading newline frame", func(t *testing.T) {
+		frames := parseStack("ReferenceError: boom\n    at foo (a.js:2:3)\n    at bar (b.js:4:5)")
+		require.Len(t, frames, 2)
+		assert.Equal(t, "foo", frames[0].Function)
+		assert.Equal(t, "a.js", frames[0].File)
+		assert.Equal(t, 2, frames[0].Line)
+		assert.Equal(t, 3, frames[0].Col)
+		assert.Equal(t, "bar", frames[1].Function)
+		assert.Equal(t, "b.js", frames[1].File)
+	})
+
+	t.Run("stack starting with an at frame", func(t *testing.T) {
+		// QuickJS async errors can produce a stack that begins directly with
+		// an "at" frame and no leading newline.
+		frames := parseStack("    at <eval> (test.js:21:1)\n")
+		require.Len(t, frames, 1)
+		assert.Equal(t, "<eval>", frames[0].Function)
+		assert.Equal(t, "test.js", frames[0].File)
+		assert.Equal(t, 21, frames[0].Line)
+		assert.Equal(t, 1, frames[0].Col)
+	})
+
+	t.Run("anonymous frame without function name", func(t *testing.T) {
+		frames := parseStack("    at without-barrier.js:1:1\n")
+		require.Len(t, frames, 1)
+		assert.Equal(t, "", frames[0].Function)
+		assert.Equal(t, "without-barrier.js", frames[0].File)
+		assert.Equal(t, 1, frames[0].Line)
+		assert.Equal(t, 1, frames[0].Col)
+	})
+
+	t.Run("empty stack", func(t *testing.T) {
+		assert.Nil(t, parseStack(""))
+	})
+}

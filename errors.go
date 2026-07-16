@@ -4,8 +4,140 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"regexp"
 	"runtime/debug"
+	"strconv"
+	"strings"
 )
+
+// stackFrameRe matches a single line of a QuickJS stack trace, for example:
+//
+//	at outer (outer.js:2:23)
+//	at without-barrier.js:1:1
+//
+// stackFrameRe matches a single line of a QuickJS stack trace, for example:
+//
+//	at outer (outer.js:2:23)
+//	at <eval> (test.js:21:1)
+//	at test.js:1:1
+//
+// Capture groups: function name (optional), file, line, column. The regex is
+// multiline-anchored so it matches frames anywhere in the trace (not just
+// those preceded by a newline), and the function name group is optional so
+// anonymous top-level frames are also parsed.
+var stackFrameRe = regexp.MustCompile(`(?m)^\s*at\s+(?:(.+?)\s+\()?(.+?):(\d+):(\d+)\)?`)
+
+// StackFrame is a single frame of a JavaScript stack trace.
+type StackFrame struct {
+	// Function is the name of the function for this frame. It is empty for
+	// top-level (anonymous) frames.
+	Function string
+	// File is the source file (or eval name) the frame originates from.
+	File string
+	// Line is the 1-based line number within File.
+	Line int
+	// Col is the 1-based column number within File.
+	Col int
+}
+
+// String renders the frame as "file:line:col".
+func (f StackFrame) String() string {
+	return fmt.Sprintf("%s:%d:%d", f.File, f.Line, f.Col)
+}
+
+// JSError represents an error thrown by JavaScript code. It captures the error
+// type, message and, when available, the raw stack trace along with its parsed
+// frames.
+type JSError struct {
+	// Type is the error constructor name (e.g. "TypeError"). It defaults to
+	// "Error" when the thrown value does not provide one.
+	Type string
+	// Message is the error message.
+	Message string
+	// Stack is the raw stack trace string as reported by the engine, or empty
+	// when unavailable.
+	Stack string
+	// Frames holds the parsed frames of Stack, in order from innermost to
+	// outermost.
+	Frames []StackFrame
+}
+
+// Error implements the error interface. It returns the error headline followed
+// by the raw stack trace when one is present.
+func (e *JSError) Error() string {
+	if e.Stack == "" {
+		return e.headline()
+	}
+	return e.headline() + "\n" + e.Stack
+}
+
+// headline returns the single-line summary of the error, including the location
+// of the innermost frame when available.
+func (e *JSError) headline() string {
+	if len(e.Frames) > 0 {
+		return fmt.Sprintf("%s: %s at %s", e.Type, e.Message, e.Frames[0])
+	}
+	return fmt.Sprintf("%s: %s", e.Type, e.Message)
+}
+
+// newJSError builds a JSError from a thrown JavaScript value.
+func newJSError(v *Value) *JSError {
+	name := v.GetPropertyStr("name")
+	defer name.Free()
+	message := v.GetPropertyStr("message")
+	defer message.Free()
+	stack := v.GetPropertyStr("stack")
+	defer stack.Free()
+
+	e := &JSError{
+		Type:    trimUndefined(name.String()),
+		Message: trimUndefined(message.String()),
+	}
+
+	// Fallback for non-Error throws, e.g. `throw "boom"` or `throw 42`.
+	if e.Type == "" && e.Message == "" {
+		e.Message = v.String()
+	}
+	if e.Type == "" {
+		e.Type = "Error"
+	}
+
+	if !stack.IsUndefined() {
+		e.Stack = stack.String()
+		e.Frames = parseStack(e.Stack)
+	}
+
+	return e
+}
+
+// trimUndefined maps the JavaScript "undefined" string to an empty string.
+func trimUndefined(s string) string {
+	if s == "undefined" {
+		return ""
+	}
+	return s
+}
+
+// parseStack extracts the frames from a raw stack trace string.
+func parseStack(stack string) []StackFrame {
+	matches := stackFrameRe.FindAllStringSubmatch(stack, -1)
+	if len(matches) == 0 {
+		return nil
+	}
+
+	frames := make([]StackFrame, 0, len(matches))
+	for _, m := range matches {
+		line, _ := strconv.Atoi(m[3])
+		col, _ := strconv.Atoi(m[4])
+		frames = append(frames, StackFrame{
+			Function: strings.TrimSpace(m[1]),
+			File:     m[2],
+			Line:     line,
+			Col:      col,
+		})
+	}
+	return frames
+}
 
 var (
 	ErrRType                   = reflect.TypeOf((*error)(nil)).Elem()
