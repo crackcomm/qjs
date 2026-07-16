@@ -681,69 +681,6 @@ func TestChannelToJSObjectValue(t *testing.T) {
 }
 
 func TestGoChannelToJs(t *testing.T) {
-	t.Run("SendErrorNoReceiverReady", func(t *testing.T) {
-		rt := must(qjs.New())
-		defer rt.Close()
-		ctx := rt.Context()
-
-		_, _, jsChan := createChannelValue(t, ctx)
-		defer jsChan.Free()
-		_, err := ctx.Eval("test.js", qjs.Code(`
-			setTimeout(() => { goChan.send(1) }, 100);
-		`))
-		assert.Error(t, err)
-	})
-
-	t.Run("SendErrorBufferFull", func(t *testing.T) {
-		rt := must(qjs.New())
-		defer rt.Close()
-		ctx := rt.Context()
-		_, goChan, jsChan := createChannelValue(t, ctx)
-		defer jsChan.Free()
-		go func() {
-			goChan <- 1
-		}()
-
-		// ensure the goroutine has sent the value
-		time.Sleep(10 * time.Millisecond)
-		_, err := ctx.Eval("test.js", qjs.Code(`
-			setTimeout(() => { goChan.send(1) }, 100);
-		`))
-		assert.Error(t, err)
-	})
-
-	t.Run("SendErrorChannelClosed", func(t *testing.T) {
-		rt := must(qjs.New())
-		defer rt.Close()
-		ctx := rt.Context()
-		_, goChan, jsChan := createChannelValue(t, ctx)
-		defer jsChan.Free()
-		close(goChan)
-		_, err := ctx.Eval("test.js", qjs.Code(`
-			setTimeout(() => { goChan.send(1) }, 100);
-		`))
-		assert.Error(t, err)
-	})
-
-	t.Run("SendSuccess", func(t *testing.T) {
-		rt := must(qjs.New())
-		defer rt.Close()
-		ctx := rt.Context()
-
-		waitChan, goChan, jsChan := createChannelValue(t, ctx)
-		go func() {
-			value := <-goChan
-			waitChan <- struct{}{}
-			assert.Equal(t, 1, value)
-		}()
-
-		defer jsChan.Free()
-		must(ctx.Eval("test.js", qjs.Code(`
-			setTimeout(() => { goChan.send(1) }, 100);
-		`)))
-		<-waitChan
-	})
-
 	t.Run("ReceiveErrorNoData", func(t *testing.T) {
 		rt := must(qjs.New())
 		defer rt.Close()

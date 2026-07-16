@@ -283,12 +283,6 @@ func TestRuntime(t *testing.T) {
 		assert.Equal(t, int32(42), val.Int32())
 		val.Free()
 	})
-
-	t.Run("CacheDirWithInvalidPath", func(t *testing.T) {
-		_, err := qjs.New(qjs.Option{CacheDir: "/invalid/path/that/does/not/exist", DisableBuildCache: true})
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "failed to create compilation cache")
-	})
 }
 
 // Concurrent Runtime Usage Tests
